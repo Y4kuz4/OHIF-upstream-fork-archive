@@ -218,6 +218,12 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
           yOffset: 0.05,
         },
         disableOnPassive: true,
+        centerPoint: {
+          enabled: true,
+          color: 'rgba(255, 220, 0, 0.95)',
+          size: 1,
+        },
+        referenceLinesCenterGapRadius: 0,
         autoPan: {
           enabled: false,
           panSize: 10,
