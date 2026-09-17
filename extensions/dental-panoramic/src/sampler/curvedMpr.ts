@@ -18,6 +18,11 @@ export type CurvedMprOptions = {
   spacing: number;
   /** Height of the reconstructed strip along `up`, mm. */
   heightMm?: number;
+  /** Absolute volume limits projected along `up`, in world-space mm. */
+  verticalRange?: {
+    min: number;
+    max: number;
+  };
   /**
    * Slab thickness along the radial (buccal–lingual) axis, mm.
    * Several voxels are sampled and combined (`composite`).
@@ -86,7 +91,18 @@ function combineSlab(values: number[], composite: CurvedMprComposite): number {
  */
 export function sampleCurvedMpr(options: CurvedMprOptions): CurvedMprResult {
   const { controlPoints, sampleAtWorld, spacing } = options;
-  const heightMm = options.heightMm ?? DEFAULT_HEIGHT_MM;
+  const verticalMin = Math.min(
+    options.verticalRange?.min ?? Number.POSITIVE_INFINITY,
+    options.verticalRange?.max ?? Number.POSITIVE_INFINITY
+  );
+  const verticalMax = Math.max(
+    options.verticalRange?.min ?? Number.NEGATIVE_INFINITY,
+    options.verticalRange?.max ?? Number.NEGATIVE_INFINITY
+  );
+  const hasVerticalRange = Number.isFinite(verticalMin) && Number.isFinite(verticalMax);
+  const heightMm = hasVerticalRange
+    ? Math.max(spacing, verticalMax - verticalMin)
+    : (options.heightMm ?? DEFAULT_HEIGHT_MM);
   const thicknessMm = options.thicknessMm ?? DEFAULT_THICKNESS_MM;
   const composite = options.composite ?? 'mean';
   const up = normalize(options.up ?? [0, 0, 1]);
@@ -134,7 +150,15 @@ export function sampleCurvedMpr(options: CurvedMprOptions): CurvedMprResult {
 
     for (let r = 0; r < rows; r++) {
       // Row 0 is superior (+up / maxilla) so the stack looks like a real PX, not upside-down.
-      const h = halfH - r * rowSpacing;
+      let h = halfH - r * rowSpacing;
+      if (hasVerticalRange) {
+        const targetProjection = verticalMax - r * rowSpacing;
+        const pointProjection = p[0] * up[0] + p[1] * up[1] + p[2] * up[2];
+        const localUpProjection = U[0] * up[0] + U[1] * up[1] + U[2] * up[2];
+        if (Math.abs(localUpProjection) > 1e-6) {
+          h = (targetProjection - pointProjection) / localUpProjection;
+        }
+      }
       const cx = p[0] + h * U[0];
       const cy = p[1] + h * U[1];
       const cz = p[2] + h * U[2];

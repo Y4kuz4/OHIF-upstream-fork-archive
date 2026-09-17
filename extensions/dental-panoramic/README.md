@@ -8,5 +8,6 @@ Lab extension for OHIF (`/viewer`, mode basic / longitudinal): Romexis-style den
 - **Limpiar curva** — removes the control curve and its derived panoramic viewport so a new curve can be traced cleanly.
 - Curve edits are debounced and use latest-change-wins semantics, so moving, adding, or deleting a control point refreshes the derived panoramic without allowing an older reconstruction to replace it.
 - Reconstruction uses `VoxelManager.sampleAtWorld` (trilinear), mean of the slab. Row 0 is superior (maxilla on top). Transversals / Autofit are out of scope.
+- The reconstructed image spans the full superior–inferior extent of the source volume; it is not limited to a fixed strip around the drawn curve.
 
 Not a measurement tool (`PanoramicCurve.isAnnotation = false`). One active curve per study in this MVP.

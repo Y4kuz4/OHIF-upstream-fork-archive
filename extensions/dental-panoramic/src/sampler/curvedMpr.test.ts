@@ -64,6 +64,23 @@ describe('sampleCurvedMpr', () => {
     expect(lastRow).toBeCloseTo(-5, 0);
   });
 
+  it('uses the complete absolute vertical range instead of centering on the curve', () => {
+    const result = sampleCurvedMpr({
+      controlPoints: [
+        [0, 0, 40],
+        [8, 0, 40],
+      ],
+      sampleAtWorld: ([, , z]: Point3) => z,
+      spacing: 1,
+      verticalRange: { min: -10, max: 25 },
+      thicknessMm: 0,
+      up: [0, 0, 1],
+    });
+
+    expect(result.pixels[0]).toBeCloseTo(25, 5);
+    expect(result.pixels[(result.rows - 1) * result.columns]).toBeCloseTo(-10, 5);
+  });
+
   it('thin slab misses an off-curve peak that a thick slab includes', () => {
     // Straight X arch → radial is ±Y. Peak sits 2 mm off the curve.
     const sampleAtWorld = ([, y]: Point3) => (Math.abs(y - 2) < 0.4 ? 100 : 0);

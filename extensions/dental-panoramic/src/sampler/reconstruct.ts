@@ -2,8 +2,9 @@ import { cache, Enums, imageLoader, volumeLoader } from '@cornerstonejs/core';
 import { utilities as csUtils } from '@cornerstonejs/core';
 import { classes } from '@ohif/core';
 import type { Point3 } from '../curve/types';
-import { DEFAULT_HEIGHT_MM, sampleCurvedMpr } from './curvedMpr';
+import { sampleCurvedMpr } from './curvedMpr';
 import { getPanoramicThicknessMm } from './thickness';
+import { getVolumeProjectionRange } from './volumeGeometry';
 
 const { ImageSet } = classes;
 const { VoxelManager, genericMetadataProvider } = csUtils;
@@ -130,7 +131,7 @@ export async function reconstructPanoramic({
   displaySet,
   dataSource,
   displaySetService,
-  heightMm = DEFAULT_HEIGHT_MM,
+  heightMm,
   thicknessMm = getPanoramicThicknessMm(),
 }: {
   controlPoints: Point3[];
@@ -146,14 +147,17 @@ export async function reconstructPanoramic({
   }
 
   const spacing = minSpacing(volume);
+  const up: Point3 = [0, 0, 1];
+  const verticalRange = heightMm == null ? getVolumeProjectionRange(volume, up) : undefined;
   const result = sampleCurvedMpr({
     controlPoints,
     sampleAtWorld: sampleAtWorldFromVolume(volume),
     spacing,
     heightMm,
+    verticalRange,
     thicknessMm,
     composite: 'mean',
-    up: [0, 0, 1],
+    up,
   });
 
   if (!result.columns || !result.rows) {
