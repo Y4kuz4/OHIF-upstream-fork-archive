@@ -2,6 +2,8 @@
 
 Lab extension for OHIF (`/viewer`, mode basic / longitudinal): Romexis-style dental-arch curve and CPU curved-MPR panoramic.
 
+The panoramic actions are grouped in a split toolbar button: the active curve action remains available as the primary button, while drawing, editing, thickness, and clearing are available from its dropdown.
+
 - **Dibujar curva** — left click adds/inserts control points; right click finishes and reconstructs. Click the button again (or Esc) to leave the tool.
 - **Editar curva** — drag handles or the green polyline; Ctrl adds/deletes. Click again or Esc to leave. Only this button stays highlighted in edit mode.
 - **Espesor** — slider 1–40 mm (default 20) for the buccal–lingual slab. Every change, including the final value when the slider is released, rebuilds the panoramic from the last valid curve.

@@ -5,6 +5,13 @@ const { TOOLBAR_SECTIONS } = ToolbarService;
 
 const toolbarButtons: Button[] = [
   {
+    id: 'PanoramicTools',
+    uiType: 'dentalPanoramic.toolsButton',
+    props: {
+      buttonSection: true,
+    },
+  },
+  {
     id: 'PanoramicCurve',
     uiType: 'ohif.toolButton',
     props: {
@@ -62,11 +69,14 @@ const toolbarSections = {
     'Capture',
     'Layout',
     'Crosshairs',
+    'PanoramicTools',
+    'MoreTools',
+  ],
+  PanoramicTools: [
     'PanoramicCurve',
     'EditPanoramicCurve',
     'PanoramicThickness',
     'ClearPanoramicCurve',
-    'MoreTools',
   ],
 };
 
