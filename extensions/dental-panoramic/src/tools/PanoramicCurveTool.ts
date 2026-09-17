@@ -25,6 +25,7 @@ const { drawHandles, drawPolyline } = drawing;
 const GREEN = 'rgb(0, 200, 80)';
 const TROUGH_GREEN = 'rgb(0, 180, 110)';
 const CURVE_EVENT = 'dentalpanoramiccurve';
+const pendingRenderElements = new WeakSet<HTMLDivElement>();
 
 type CurveCallback = (detail: {
   points: Point3[];
@@ -214,12 +215,10 @@ class PanoramicCurveTool extends AnnotationTool {
       annotationRecord.data.handles.points = translatePoints(points, delta);
     }
     this.editData.lastWorld = [...world];
-    this._emit(
-      element,
-      annotationRecord.data.handles.points,
-      this.curveMode === 'edit' ? 'edit' : 'drawing'
-    );
-    triggerRender(element);
+    // Keep dragging purely visual. Reconstructing (and copying/emitting all
+    // points) while the pointer is down makes point movement stutter. The
+    // final edit is emitted once from _endCallback.
+    scheduleRender(element);
   };
 
   _endCallback = evt => {
@@ -332,6 +331,23 @@ function triggerRender(element) {
     return;
   }
   toolUtilities.triggerAnnotationRenderForViewportIds([enabled.viewport.id]);
+}
+
+function scheduleRender(element: HTMLDivElement) {
+  if (pendingRenderElements.has(element)) {
+    return;
+  }
+  pendingRenderElements.add(element);
+
+  const flush = () => {
+    pendingRenderElements.delete(element);
+    triggerRender(element);
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(flush);
+  } else {
+    setTimeout(flush, 0);
+  }
 }
 
 export function clearPanoramicCurves(element: HTMLDivElement) {
