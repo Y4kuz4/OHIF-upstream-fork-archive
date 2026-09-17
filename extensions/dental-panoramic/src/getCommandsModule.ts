@@ -8,6 +8,7 @@ import PanoramicCurveTool, {
 import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
 import type { Point3 } from './curve/types';
+import { updatePanoramicViewportImage } from './viewport/updatePanoramicViewport';
 
 const { MouseBindings, KeyboardBindings } = csToolsEnums;
 const TOOL_NAME = PanoramicCurveTool.toolName;
@@ -553,10 +554,7 @@ function commandsModule({
       });
 
       const panViewport = cornerstoneViewportService.getCornerstoneViewport(panId);
-      if (imageId && panViewport?.setImageIds) {
-        panViewport.setImageIds([imageId]);
-        panViewport.render();
-      }
+      await updatePanoramicViewportImage(panViewport, imageId);
     },
   };
 
