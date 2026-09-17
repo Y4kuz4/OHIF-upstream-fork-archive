@@ -280,11 +280,13 @@ class PanoramicCurveTool extends AnnotationTool {
         });
       }
 
-      drawHandles(svgDrawingHelper, annotationRecord.annotationUID, 'handles', canvasHandles, {
-        color: GREEN,
-        handleRadius: 6,
-        fill: GREEN,
-      });
+      if (!annotationRecord.data?.completed || this.curveMode === 'edit') {
+        drawHandles(svgDrawingHelper, annotationRecord.annotationUID, 'handles', canvasHandles, {
+          color: GREEN,
+          handleRadius: 6,
+          fill: GREEN,
+        });
+      }
     }
 
     return true;

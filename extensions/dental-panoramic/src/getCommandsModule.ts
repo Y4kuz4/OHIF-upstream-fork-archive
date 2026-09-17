@@ -91,6 +91,20 @@ function commandsModule({
       toolbarService?.refreshToolbarState?.({ viewportId });
     },
 
+    renderCurveAnnotations() {
+      const state = viewportGridService.getState();
+      for (const viewportId of state.viewports.keys()) {
+        const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+        if (!viewport?.element) {
+          continue;
+        }
+        const curves = annotation.state.getAnnotations(TOOL_NAME, viewport.element) || [];
+        if (curves.length) {
+          renderPanoramicCurve(viewport.element);
+        }
+      }
+    },
+
     scheduleReconstruction({ points, viewportId, sourceDisplaySetUID }: CurveContext) {
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -204,6 +218,7 @@ function commandsModule({
       };
       window.addEventListener('keydown', escapeHandler);
       actions.refreshCurveToolbar();
+      actions.renderCurveAnnotations();
     },
 
     deactivateCurveTool({ restore } = { restore: true }) {
@@ -250,6 +265,7 @@ function commandsModule({
         }
       });
       actions.refreshCurveToolbar();
+      actions.renderCurveAnnotations();
     },
 
     drawPanoramicCurve() {
