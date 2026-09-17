@@ -47,6 +47,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'PanoramicSharpness',
+    uiType: 'dentalPanoramic.sharpnessButton',
+    props: {
+      icon: 'Threshold',
+      label: 'Nitidez',
+      tooltip: 'Realce de bordes de la reconstrucción panorámica',
+      commands: 'setPanoramicSharpness',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'ClearPanoramicCurve',
     uiType: 'ohif.toolButton',
     props: {
@@ -76,6 +87,7 @@ const toolbarSections = {
     'PanoramicCurve',
     'EditPanoramicCurve',
     'PanoramicThickness',
+    'PanoramicSharpness',
     'ClearPanoramicCurve',
   ],
 };

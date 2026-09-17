@@ -4,6 +4,7 @@ import { classes } from '@ohif/core';
 import type { Point3 } from '../curve/types';
 import { sampleCurvedMpr } from './curvedMpr';
 import { getPanoramicThicknessMm } from './thickness';
+import { applyPanoramicSharpen, getPanoramicSharpness } from './sharpness';
 import { getVolumeProjectionRange } from './volumeGeometry';
 
 const { ImageSet } = classes;
@@ -133,6 +134,7 @@ export async function reconstructPanoramic({
   displaySetService,
   heightMm,
   thicknessMm = getPanoramicThicknessMm(),
+  sharpness = getPanoramicSharpness(),
 }: {
   controlPoints: Point3[];
   displaySet;
@@ -140,6 +142,7 @@ export async function reconstructPanoramic({
   displaySetService;
   heightMm?: number;
   thicknessMm?: number;
+  sharpness?: number;
 }) {
   const volume = await getOrCreateVolume(displaySet, dataSource);
   if (!volume) {
@@ -149,7 +152,7 @@ export async function reconstructPanoramic({
   const spacing = minSpacing(volume);
   const up: Point3 = [0, 0, 1];
   const verticalRange = heightMm == null ? getVolumeProjectionRange(volume, up) : undefined;
-  const result = sampleCurvedMpr({
+  const sampledResult = sampleCurvedMpr({
     controlPoints,
     sampleAtWorld: sampleAtWorldFromVolume(volume),
     spacing,
@@ -159,6 +162,15 @@ export async function reconstructPanoramic({
     composite: 'mean',
     up,
   });
+  const result = {
+    ...sampledResult,
+    pixels: applyPanoramicSharpen(
+      sampledResult.pixels,
+      sampledResult.columns,
+      sampledResult.rows,
+      sharpness
+    ),
+  };
 
   if (!result.columns || !result.rows) {
     throw new Error('La curva no tiene longitud suficiente');

@@ -15,20 +15,30 @@ import {
   MIN_THICKNESS_MM,
   subscribePanoramicThickness,
 } from '../sampler/thickness';
+import {
+  getPanoramicSharpness,
+  MAX_SHARPNESS,
+  MIN_SHARPNESS,
+  subscribePanoramicSharpness,
+} from '../sampler/sharpness';
 
 const THICKNESS_BUTTON_ID = 'PanoramicThickness';
+const SHARPNESS_BUTTON_ID = 'PanoramicSharpness';
+const CONTROL_BUTTON_IDS = new Set([THICKNESS_BUTTON_ID, SHARPNESS_BUTTON_ID]);
 
 export default function PanoramicToolsButton({ id, buttonSection = id }) {
   const { onInteraction, toolbarButtons } = useToolbar({ buttonSection });
   const [mm, setMm] = useState(getPanoramicThicknessMm);
+  const [sharpness, setSharpness] = useState(getPanoramicSharpness);
 
   useEffect(() => subscribePanoramicThickness(setMm), []);
+  useEffect(() => subscribePanoramicSharpness(setSharpness), []);
 
   if (!toolbarButtons?.length) {
     return null;
   }
 
-  const actionableButtons = toolbarButtons.filter(button => button.id !== THICKNESS_BUTTON_ID);
+  const actionableButtons = toolbarButtons.filter(button => !CONTROL_BUTTON_IDS.has(button.id));
   const primaryButton =
     actionableButtons.find(button => button.componentProps.isActive) ?? actionableButtons[0];
   const primary = primaryButton?.componentProps;
@@ -40,6 +50,11 @@ export default function PanoramicToolsButton({ id, buttonSection = id }) {
   const handleThicknessChange = ([value]) => {
     setMm(value);
     onInteraction?.({ itemId: THICKNESS_BUTTON_ID, value });
+  };
+
+  const handleSharpnessChange = ([value]) => {
+    setSharpness(value);
+    onInteraction?.({ itemId: SHARPNESS_BUTTON_ID, value });
   };
 
   return (
@@ -102,6 +117,25 @@ export default function PanoramicToolsButton({ id, buttonSection = id }) {
             <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
               <span>{MIN_THICKNESS_MM} mm</span>
               <span>{MAX_THICKNESS_MM} mm</span>
+            </div>
+            <div className="border-border mt-3 border-t pt-3">
+              <div className="text-foreground mb-2 flex items-center justify-between text-xs">
+                <span>Nitidez</span>
+                <span className="tabular-nums">{sharpness}%</span>
+              </div>
+              <Slider
+                aria-label="Nitidez panorámica"
+                min={MIN_SHARPNESS}
+                max={MAX_SHARPNESS}
+                step={1}
+                value={[sharpness]}
+                onValueChange={handleSharpnessChange}
+                onValueCommit={handleSharpnessChange}
+              />
+              <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
+                <span>{MIN_SHARPNESS}%</span>
+                <span>{MAX_SHARPNESS}%</span>
+              </div>
             </div>
           </div>
         </ToolButtonListDropDown>

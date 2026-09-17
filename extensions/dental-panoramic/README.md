@@ -8,6 +8,7 @@ The panoramic actions are grouped in a split toolbar button: the active curve ac
 - **Editar curva** — drag handles or the green polyline; Ctrl adds/deletes. Click again or Esc to leave. Only this button stays highlighted in edit mode.
 - Control points are hidden after the panoramic is generated. Choosing **Editar curva** shows them again: dragging a point changes only that point, while dragging the centerline moves the complete curve.
 - **Espesor** — slider 1–40 mm (default 20) for the buccal–lingual slab. Changes rebuild after a short idle delay, or are deferred until exit when curve editing is active.
+- **Nitidez** — slider 0–100% (default 0) applying a 3×3 Gaussian unsharp mask to the reconstructed pixels; 0% preserves the original result.
 - The axial viewport displays that thickness as a translucent band bounded by dashed lines around the green curve, updating with the slider.
 - **Limpiar curva** — removes the control curve and its derived panoramic viewport so a new curve can be traced cleanly.
 - Edit mode never reconstructs while it is active, so any number of control points can be moved continuously. Leaving edit mode (toolbar toggle or `Esc`) starts one reconstruction from the final curve.
