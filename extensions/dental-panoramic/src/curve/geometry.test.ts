@@ -4,6 +4,7 @@ import {
   deletePoint,
   distance3,
   hitTestHandle,
+  hitTestInterpolatedCurve,
   hitTestSegment,
   insertPoint,
   interpolateSpline,
@@ -113,6 +114,29 @@ describe('curve geometry', () => {
         modifiers: { ctrl: true, shift: false, secondary: false },
       })
     ).toEqual({ type: 'delete', index: 1 });
+  });
+
+  it('Ctrl+click inserts between control points on the rendered curve', () => {
+    const controlPoints: [number, number][] = [
+      [0, 0],
+      [10, 20],
+      [20, 0],
+      [30, 0],
+    ];
+    const clickOnSpline: [number, number] = [15, 11.25];
+    const curvedHit = hitTestInterpolatedCurve(controlPoints, clickOnSpline, 0.25);
+
+    expect(hitTestSegment(controlPoints, clickOnSpline, 0.25)).toBeNull();
+    expect(curvedHit?.insertIndex).toBe(2);
+    expect(
+      resolveCurveClick({
+        mode: 'draw',
+        canvasPoints: controlPoints,
+        clickCanvas: clickOnSpline,
+        modifiers: { ctrl: true, shift: false, secondary: false },
+        proximity: 0.25,
+      })
+    ).toEqual({ type: 'insert', index: 2 });
   });
 
   it('edit mode drags the whole curve when hitting the line', () => {

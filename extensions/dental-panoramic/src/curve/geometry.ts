@@ -69,6 +69,50 @@ export function hitTestSegment(
   return best ? { insertIndex: best.insertIndex, t: best.t } : null;
 }
 
+/**
+ * Hit-tests the rendered Catmull-Rom curve while preserving the control-point
+ * segment to which a newly inserted point belongs.
+ */
+export function hitTestInterpolatedCurve(
+  canvasPoints: Point2[],
+  click: Point2,
+  proximity = DEFAULT_PROXIMITY_PX,
+  samplesPerSegment = 12
+): { insertIndex: number; t: number } | null {
+  if (canvasPoints.length < 2) {
+    return null;
+  }
+
+  let best: { insertIndex: number; t: number; dist: number } | null = null;
+  const asPoint3 = (point: Point2): Point3 => [point[0], point[1], 0];
+
+  for (let controlIndex = 0; controlIndex < canvasPoints.length - 1; controlIndex++) {
+    const p0 = asPoint3(canvasPoints[Math.max(0, controlIndex - 1)]);
+    const p1 = asPoint3(canvasPoints[controlIndex]);
+    const p2 = asPoint3(canvasPoints[controlIndex + 1]);
+    const p3 = asPoint3(canvasPoints[Math.min(canvasPoints.length - 1, controlIndex + 2)]);
+    let previous: Point2 = [p1[0], p1[1]];
+
+    for (let sample = 1; sample <= samplesPerSegment; sample++) {
+      const sampleT = sample / samplesPerSegment;
+      const sampled = catmullRom(p0, p1, p2, p3, sampleT);
+      const current: Point2 = [sampled[0], sampled[1]];
+      const hit = closestOnSegment(previous, current, click);
+
+      if (hit.dist <= proximity && (best === null || hit.dist < best.dist)) {
+        best = {
+          insertIndex: controlIndex + 1,
+          t: (sample - 1 + hit.t) / samplesPerSegment,
+          dist: hit.dist,
+        };
+      }
+      previous = current;
+    }
+  }
+
+  return best ? { insertIndex: best.insertIndex, t: best.t } : null;
+}
+
 export function isBeyondEnd(
   canvasPoints: Point2[],
   click: Point2,
@@ -143,7 +187,7 @@ export function resolveCurveClick(options: {
     if (handle >= 0) {
       return { type: 'delete', index: handle };
     }
-    const seg = hitTestSegment(canvasPoints, clickCanvas, proximity);
+    const seg = hitTestInterpolatedCurve(canvasPoints, clickCanvas, proximity);
     if (seg) {
       return { type: 'insert', index: seg.insertIndex };
     }
@@ -167,7 +211,7 @@ export function resolveCurveClick(options: {
     if (handle >= 0) {
       return { type: 'moveHandle', index: handle };
     }
-    const seg = hitTestSegment(canvasPoints, clickCanvas, proximity);
+    const seg = hitTestInterpolatedCurve(canvasPoints, clickCanvas, proximity);
     if (seg) {
       return { type: 'moveCurve' };
     }
@@ -178,7 +222,7 @@ export function resolveCurveClick(options: {
   if (handle >= 0) {
     return { type: 'ignore' };
   }
-  const seg = hitTestSegment(canvasPoints, clickCanvas, proximity);
+  const seg = hitTestInterpolatedCurve(canvasPoints, clickCanvas, proximity);
   if (seg) {
     return { type: 'insert', index: seg.insertIndex };
   }

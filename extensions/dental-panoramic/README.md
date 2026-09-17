@@ -11,6 +11,7 @@ The panoramic actions are grouped in a split toolbar button: the active curve ac
 - The axial viewport displays that thickness as a translucent band bounded by dashed lines around the green curve, updating with the slider.
 - **Limpiar curva** — removes the control curve and its derived panoramic viewport so a new curve can be traced cleanly.
 - Curve edits are debounced and use latest-change-wins semantics, so moving, adding, or deleting a control point refreshes the derived panoramic without allowing an older reconstruction to replace it.
+- While drawing or editing, `Ctrl + click` on the rendered curve inserts a control point between its neighbours (`Ctrl + click` on an existing handle removes it).
 - Moving the complete curve changes its world-space position over the source volume; the derived `StackViewport` is then replaced with the newly sampled voxel image.
 - Reconstruction uses `VoxelManager.sampleAtWorld` (trilinear), mean of the slab. Row 0 is superior (maxilla on top). Transversals / Autofit are out of scope.
 - The reconstructed image spans the full superior–inferior extent of the source volume; it is not limited to a fixed strip around the drawn curve.

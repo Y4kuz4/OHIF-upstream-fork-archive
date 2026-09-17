@@ -18,7 +18,7 @@ const toolbarButtons: Button[] = [
       icon: 'icon-tool-spline-roi',
       label: 'Dibujar curva',
       tooltip:
-        'Trazar curva panorámica: clic izquierdo añade puntos, clic derecho termina. Clic de nuevo para salir.',
+        'Trazar curva panorámica: clic izquierdo añade puntos, Ctrl + clic inserta entre puntos y clic derecho termina.',
       commands: 'drawPanoramicCurve',
       evaluate: 'evaluate.dentalPanoramic.draw',
     },
@@ -30,7 +30,7 @@ const toolbarButtons: Button[] = [
       icon: 'tool-annotate',
       label: 'Editar curva',
       tooltip:
-        'Editar la curva: arrastra puntos o la línea; Ctrl añade/borra. Clic de nuevo o Esc para salir.',
+        'Editar la curva: arrastra puntos o la línea; Ctrl + clic sobre la curva inserta y sobre un punto borra. Clic de nuevo o Esc para salir.',
       commands: 'editPanoramicCurve',
       evaluate: 'evaluate.dentalPanoramic.edit',
     },
