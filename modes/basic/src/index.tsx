@@ -88,6 +88,7 @@ export const extensionDependencies = {
   '@ohif/extension-cornerstone-dicom-rt': '^3.0.0',
   '@ohif/extension-dicom-pdf': '^3.0.1',
   '@ohif/extension-dicom-video': '^3.0.1',
+  '@ohif/extension-dental-panoramic': '^3.0.0',
 };
 
 export const sopClassHandlers = [
@@ -326,7 +327,10 @@ export const modeInstance = {
   // `toolGroupAdditions` keys), so `?customization=` modules extend them
   // through the `mode` phase (e.g.
   // `mode.basic.toolbarButtons: { $push: [{ $reference: '...' }] }`).
-  toolbarSections: [{ $reference: 'cornerstone.toolbarSections' }],
+  toolbarSections: [
+    { $reference: 'cornerstone.toolbarSections' },
+    { $reference: 'dentalPanoramic.toolbarSections' },
+  ],
   toolGroupAdditions: {
     default: [],
     mpr: [],
@@ -367,7 +371,10 @@ export const modeInstance = {
   // general handler needs to come last.  For this case, the dicomvideo must
   // come first to remove video transfer syntax before ohif uses images
   sopClassHandlers,
-  toolbarButtons: [{ $reference: 'cornerstone.toolbarButtons' }],
+  toolbarButtons: [
+    { $reference: 'cornerstone.toolbarButtons' },
+    { $reference: 'dentalPanoramic.toolbarButtons' },
+  ],
   nonModeModalities: NON_IMAGE_MODALITIES,
 };
 

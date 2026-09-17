@@ -80,6 +80,7 @@ function initDefaultToolGroup(extensionManager, toolGroupService, commandsManage
       { toolName: toolNames.UltrasoundDirectional },
       { toolName: toolNames.PlanarFreehandROI },
       { toolName: toolNames.SplineROI },
+      { toolName: 'PanoramicCurve' },
       { toolName: toolNames.LivewireContour },
       { toolName: toolNames.WindowLevelRegion },
     ],
@@ -227,6 +228,7 @@ function initMPRToolGroup(extensionManager, toolGroupService, commandsManager) {
       { toolName: toolNames.SplineROI },
       { toolName: toolNames.LivewireContour },
       { toolName: toolNames.WindowLevelRegion },
+      { toolName: 'PanoramicCurve' },
       {
         toolName: toolNames.PlanarFreehandContourSegmentation,
         configuration: {
