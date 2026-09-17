@@ -12,6 +12,7 @@ import { updatePanoramicViewportImage } from './viewport/updatePanoramicViewport
 
 const { MouseBindings, KeyboardBindings } = csToolsEnums;
 const TOOL_NAME = PanoramicCurveTool.toolName;
+const EDIT_RECONSTRUCTION_DEBOUNCE_MS = 800;
 
 const CROSSHAIR_SHIFT_BINDING = {
   mouseButton: MouseBindings.Primary,
@@ -119,7 +120,7 @@ function commandsModule({
           viewportId,
           sourceDisplaySetUID,
         });
-      }, 150);
+      }, EDIT_RECONSTRUCTION_DEBOUNCE_MS);
     },
 
     bindCurveTool({ editMode }: { editMode: boolean }) {
