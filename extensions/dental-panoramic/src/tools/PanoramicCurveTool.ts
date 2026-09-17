@@ -8,6 +8,7 @@ import {
 } from '@cornerstonejs/tools';
 import {
   DEFAULT_PROXIMITY_PX,
+  createThicknessEnvelope,
   deletePoint,
   insertPoint,
   interpolateSpline,
@@ -15,12 +16,14 @@ import {
   translatePoints,
 } from '../curve/geometry';
 import type { CurveMode, Point2, Point3 } from '../curve/types';
+import { getPanoramicThicknessMm } from '../sampler/thickness';
 
 const { MouseBindings } = Enums;
 const { addAnnotation, getAnnotations, removeAnnotations } = annotation.state;
 const { drawHandles, drawPolyline } = drawing;
 
 const GREEN = 'rgb(0, 200, 80)';
+const TROUGH_GREEN = 'rgb(0, 180, 110)';
 const CURVE_EVENT = 'dentalpanoramiccurve';
 
 type CurveCallback = (detail: {
@@ -248,6 +251,28 @@ class PanoramicCurveTool extends AnnotationTool {
       const canvasSpline = spline.map(p => viewport.worldToCanvas(p));
 
       if (canvasSpline.length >= 2) {
+        const envelope = createThicknessEnvelope(spline, getPanoramicThicknessMm());
+        const canvasEnvelope = [
+          ...envelope.positive.map(p => viewport.worldToCanvas(p)),
+          ...envelope.negative
+            .slice()
+            .reverse()
+            .map(p => viewport.worldToCanvas(p)),
+        ];
+        drawPolyline(
+          svgDrawingHelper,
+          annotationRecord.annotationUID,
+          'thickness-envelope',
+          canvasEnvelope,
+          {
+            color: TROUGH_GREEN,
+            width: 1,
+            lineDash: '4,3',
+            fillColor: TROUGH_GREEN,
+            fillOpacity: 0.12,
+            closePath: true,
+          }
+        );
         drawPolyline(svgDrawingHelper, annotationRecord.annotationUID, 'curve', canvasSpline, {
           color: GREEN,
           width: 1.5,
@@ -309,6 +334,10 @@ function triggerRender(element) {
 
 export function clearPanoramicCurves(element: HTMLDivElement) {
   removeAnnotations(PanoramicCurveTool.toolName, element);
+  triggerRender(element);
+}
+
+export function renderPanoramicCurve(element: HTMLDivElement) {
   triggerRender(element);
 }
 

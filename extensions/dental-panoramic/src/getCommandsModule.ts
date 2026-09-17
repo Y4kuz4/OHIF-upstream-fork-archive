@@ -1,7 +1,10 @@
 import { cache } from '@cornerstonejs/core';
 import { Enums as csToolsEnums, annotation } from '@cornerstonejs/tools';
 import type { Types as OhifTypes } from '@ohif/core';
-import PanoramicCurveTool, { clearPanoramicCurves } from './tools/PanoramicCurveTool';
+import PanoramicCurveTool, {
+  clearPanoramicCurves,
+  renderPanoramicCurve,
+} from './tools/PanoramicCurveTool';
 import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
 import type { Point3 } from './curve/types';
@@ -386,6 +389,9 @@ function commandsModule({
     setPanoramicThickness({ value }) {
       const mm = setPanoramicThicknessMm(Number(value));
       const host = actions.findCurveHost();
+      if (host.viewport?.element) {
+        renderPanoramicCurve(host.viewport.element);
+      }
       const context =
         host.points?.length >= 2
           ? {

@@ -274,6 +274,65 @@ export function resampleByArcLength(points: Point3[], ds: number): Point3[] {
   return out;
 }
 
+/**
+ * Builds the two world-space limits of the panoramic focal trough. The radial
+ * direction matches the curved-MPR sampler: tangent crossed with world-up.
+ */
+export function createThicknessEnvelope(
+  points: Point3[],
+  thicknessMm: number,
+  up: Point3 = [0, 0, 1]
+): { negative: Point3[]; positive: Point3[] } {
+  if (!points.length) {
+    return { negative: [], positive: [] };
+  }
+
+  const halfThickness = Math.max(0, thicknessMm) / 2;
+  const negative: Point3[] = [];
+  const positive: Point3[] = [];
+  let previousRadial: Point3 | null = null;
+
+  for (let i = 0; i < points.length; i++) {
+    const previous = points[Math.max(0, i - 1)];
+    const next = points[Math.min(points.length - 1, i + 1)];
+    const tangent: Point3 = [next[0] - previous[0], next[1] - previous[1], next[2] - previous[2]];
+    const cross: Point3 = [
+      tangent[1] * up[2] - tangent[2] * up[1],
+      tangent[2] * up[0] - tangent[0] * up[2],
+      tangent[0] * up[1] - tangent[1] * up[0],
+    ];
+    const length = Math.hypot(cross[0], cross[1], cross[2]);
+    let radial: Point3 =
+      length > 1e-6
+        ? [cross[0] / length, cross[1] / length, cross[2] / length]
+        : (previousRadial ?? [1, 0, 0]);
+
+    if (
+      previousRadial &&
+      radial[0] * previousRadial[0] +
+        radial[1] * previousRadial[1] +
+        radial[2] * previousRadial[2] <
+        0
+    ) {
+      radial = [-radial[0], -radial[1], -radial[2]];
+    }
+    previousRadial = radial;
+
+    positive.push([
+      points[i][0] + radial[0] * halfThickness,
+      points[i][1] + radial[1] * halfThickness,
+      points[i][2] + radial[2] * halfThickness,
+    ]);
+    negative.push([
+      points[i][0] - radial[0] * halfThickness,
+      points[i][1] - radial[1] * halfThickness,
+      points[i][2] - radial[2] * halfThickness,
+    ]);
+  }
+
+  return { negative, positive };
+}
+
 export function polylineLength(points: Point3[]): number {
   let total = 0;
   for (let i = 1; i < points.length; i++) {

@@ -1,6 +1,8 @@
 import {
   DEFAULT_PROXIMITY_PX,
+  createThicknessEnvelope,
   deletePoint,
+  distance3,
   hitTestHandle,
   hitTestSegment,
   insertPoint,
@@ -38,14 +40,31 @@ describe('curve geometry', () => {
   });
 
   it('deletes a control point', () => {
-    expect(deletePoint([[0, 0, 0], [1, 0, 0], [2, 0, 0]], 1)).toEqual([
+    expect(
+      deletePoint(
+        [
+          [0, 0, 0],
+          [1, 0, 0],
+          [2, 0, 0],
+        ],
+        1
+      )
+    ).toEqual([
       [0, 0, 0],
       [2, 0, 0],
     ]);
   });
 
   it('translates the whole curve', () => {
-    expect(translatePoints([[0, 0, 0], [1, 0, 0]], [0, 2, 0])).toEqual([
+    expect(
+      translatePoints(
+        [
+          [0, 0, 0],
+          [1, 0, 0],
+        ],
+        [0, 2, 0]
+      )
+    ).toEqual([
       [0, 2, 0],
       [1, 2, 0],
     ]);
@@ -140,5 +159,21 @@ describe('curve geometry', () => {
     ];
     const spline = interpolateSpline(pts);
     expect(polylineLength(spline)).toBeGreaterThan(10);
+  });
+
+  it('creates a millimetric thickness envelope around the axial curve', () => {
+    const centerline: [number, number, number][] = [
+      [0, 0, 0],
+      [10, 0, 0],
+      [20, 0, 0],
+    ];
+    const envelope = createThicknessEnvelope(centerline, 20);
+
+    expect(envelope.positive).toHaveLength(centerline.length);
+    expect(envelope.negative).toHaveLength(centerline.length);
+    expect(envelope.positive[1][0]).toBeCloseTo(10);
+    expect(envelope.positive[1][1]).toBeCloseTo(-10);
+    expect(envelope.negative[1][1]).toBeCloseTo(10);
+    expect(distance3(envelope.positive[1], envelope.negative[1])).toBeCloseTo(20);
   });
 });
