@@ -1,11 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Slider,
-  ToolButton,
-} from '@ohif/ui-next';
+import { Popover, PopoverContent, PopoverTrigger, Slider, ToolButton } from '@ohif/ui-next';
 import {
   getPanoramicThicknessMm,
   MAX_THICKNESS_MM,
@@ -18,6 +12,14 @@ export default function ThicknessButton(props) {
   const [mm, setMm] = useState(getPanoramicThicknessMm);
 
   useEffect(() => subscribePanoramicThickness(setMm), []);
+
+  const handleThicknessChange = ([value]) => {
+    setMm(value);
+    onInteraction?.({
+      itemId: props.id,
+      value,
+    });
+  };
 
   return (
     <Popover>
@@ -47,13 +49,8 @@ export default function ThicknessButton(props) {
           max={MAX_THICKNESS_MM}
           step={1}
           value={[mm]}
-          onValueChange={([value]) => {
-            setMm(value);
-            onInteraction?.({
-              itemId: props.id,
-              value,
-            });
-          }}
+          onValueChange={handleThicknessChange}
+          onValueCommit={handleThicknessChange}
         />
         <div className="text-muted-foreground mt-1 flex justify-between text-[10px]">
           <span>{MIN_THICKNESS_MM} mm</span>

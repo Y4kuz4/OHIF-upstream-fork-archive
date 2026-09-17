@@ -28,6 +28,12 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 let reconstructionRequestId = 0;
 const previousCrosshairsActive = new Map<string, boolean>();
 
+type CurveContext = {
+  points: Point3[];
+  viewportId: string;
+  sourceDisplaySetUID?: string;
+};
+
 function commandsModule({
   servicesManager,
   commandsManager,
@@ -41,6 +47,7 @@ function commandsModule({
     uiNotificationService,
     toolbarService,
   } = servicesManager.services as AppTypes.Services;
+  let lastCurveContext: CurveContext | null = null;
 
   const actions = {
     getSourceViewport() {
@@ -81,14 +88,19 @@ function commandsModule({
       toolbarService?.refreshToolbarState?.({ viewportId });
     },
 
-    scheduleReconstruction({ points, viewportId }: { points: Point3[]; viewportId: string }) {
+    scheduleReconstruction({ points, viewportId, sourceDisplaySetUID }: CurveContext) {
       if (debounceTimer) {
         clearTimeout(debounceTimer);
       }
       const pointSnapshot = points.map(point => [...point] as Point3);
+      lastCurveContext = { points: pointSnapshot, viewportId, sourceDisplaySetUID };
       debounceTimer = setTimeout(() => {
         debounceTimer = null;
-        actions.reconstructFromPoints({ points: pointSnapshot, viewportId });
+        actions.reconstructFromPoints({
+          points: pointSnapshot,
+          viewportId,
+          sourceDisplaySetUID,
+        });
       }, 150);
     },
 
@@ -278,10 +290,18 @@ function commandsModule({
           if (viewportId !== activeId) {
             viewportGridService.setActiveViewportId(viewportId);
           }
-          return { viewportId, viewport, points };
+          const sourceDisplaySetUID = viewportGridService
+            .getDisplaySetsUIDsForViewport(viewportId)
+            ?.find(uid => uid !== PANORAMIC_DISPLAY_SET_UID);
+          return { viewportId, viewport, points, sourceDisplaySetUID };
         }
       }
-      return { viewportId: activeId, viewport: null, points: null };
+      return {
+        viewportId: activeId,
+        viewport: null,
+        points: null,
+        sourceDisplaySetUID: undefined,
+      };
     },
 
     editPanoramicCurve() {
@@ -304,6 +324,7 @@ function commandsModule({
 
     async clearPanoramicCurve() {
       reconstructionRequestId += 1;
+      lastCurveContext = null;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
@@ -365,20 +386,30 @@ function commandsModule({
     setPanoramicThickness({ value }) {
       const mm = setPanoramicThicknessMm(Number(value));
       const host = actions.findCurveHost();
-      if (!host.points || host.points.length < 2) {
+      const context =
+        host.points?.length >= 2
+          ? {
+              points: host.points,
+              viewportId: host.viewportId,
+              sourceDisplaySetUID: host.sourceDisplaySetUID,
+            }
+          : lastCurveContext;
+      if (!context?.points || context.points.length < 2) {
         return mm;
       }
-      actions.scheduleReconstruction({ points: host.points, viewportId: host.viewportId });
+      actions.scheduleReconstruction(context);
       return mm;
     },
 
     async reconstructFromPoints({
       points,
       viewportId,
+      sourceDisplaySetUID,
       notify = false,
     }: {
       points: Point3[];
       viewportId: string;
+      sourceDisplaySetUID?: string;
       notify?: boolean;
     }) {
       const requestId = ++reconstructionRequestId;
@@ -392,11 +423,29 @@ function commandsModule({
       }
 
       const displaySetUIDs = viewportGridService.getDisplaySetsUIDsForViewport(viewportId);
-      const sourceUid = displaySetUIDs?.find(uid => uid !== PANORAMIC_DISPLAY_SET_UID);
+      const sourceUid =
+        sourceDisplaySetUID ??
+        displaySetUIDs?.find(uid => uid !== PANORAMIC_DISPLAY_SET_UID) ??
+        lastCurveContext?.sourceDisplaySetUID;
+      if (!sourceUid) {
+        return;
+      }
       const displaySet = displaySetService.getDisplaySetByUID(sourceUid);
       if (!displaySet) {
         return;
       }
+
+      const state = viewportGridService.getState();
+      const currentSourceViewportId =
+        [...state.viewports.entries()].find(([, viewportState]) =>
+          (viewportState.displaySetInstanceUIDs || []).includes(sourceUid)
+        )?.[0] ?? viewportId;
+      const pointSnapshot = points.map(point => [...point] as Point3);
+      lastCurveContext = {
+        points: pointSnapshot,
+        viewportId: currentSourceViewportId,
+        sourceDisplaySetUID: sourceUid,
+      };
 
       const dataSource = extensionManager.getActiveDataSource()[0];
       try {
@@ -409,7 +458,7 @@ function commandsModule({
           });
         }
         const { panoramicDisplaySet, imageId } = await reconstructPanoramic({
-          controlPoints: points.map(point => [...point] as Point3),
+          controlPoints: pointSnapshot,
           displaySet,
           dataSource,
           displaySetService,
@@ -432,7 +481,7 @@ function commandsModule({
         cacheService?.stackImageIds?.delete(PANORAMIC_DISPLAY_SET_UID);
 
         await actions.showPanoramicViewport({
-          sourceViewportId: viewportId,
+          sourceViewportId: currentSourceViewportId,
           sourceDisplaySetUID: sourceUid,
           panoramicDisplaySet,
           imageId,
