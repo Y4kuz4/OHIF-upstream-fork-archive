@@ -10,7 +10,8 @@ const toolbarButtons: Button[] = [
     props: {
       icon: 'icon-tool-spline-roi',
       label: 'Dibujar curva',
-      tooltip: 'Trazar curva panorámica: clic izquierdo añade puntos, clic derecho termina. Clic de nuevo para salir.',
+      tooltip:
+        'Trazar curva panorámica: clic izquierdo añade puntos, clic derecho termina. Clic de nuevo para salir.',
       commands: 'drawPanoramicCurve',
       evaluate: 'evaluate.dentalPanoramic.draw',
     },
@@ -21,7 +22,8 @@ const toolbarButtons: Button[] = [
     props: {
       icon: 'tool-annotate',
       label: 'Editar curva',
-      tooltip: 'Editar la curva: arrastra puntos o la línea; Ctrl añade/borra. Clic de nuevo o Esc para salir.',
+      tooltip:
+        'Editar la curva: arrastra puntos o la línea; Ctrl añade/borra. Clic de nuevo o Esc para salir.',
       commands: 'editPanoramicCurve',
       evaluate: 'evaluate.dentalPanoramic.edit',
     },
@@ -34,6 +36,17 @@ const toolbarButtons: Button[] = [
       label: 'Espesor',
       tooltip: 'Espesor de la capa panorámica (bucal–lingual)',
       commands: 'setPanoramicThickness',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
+    id: 'ClearPanoramicCurve',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'icon-clear',
+      label: 'Limpiar curva',
+      tooltip: 'Eliminar la curva y la reconstrucción panorámica',
+      commands: 'clearPanoramicCurve',
       evaluate: 'evaluate.action',
     },
   },
@@ -52,6 +65,7 @@ const toolbarSections = {
     'PanoramicCurve',
     'EditPanoramicCurve',
     'PanoramicThickness',
+    'ClearPanoramicCurve',
     'MoreTools',
   ],
 };

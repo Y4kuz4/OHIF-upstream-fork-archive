@@ -1,6 +1,7 @@
+import { cache } from '@cornerstonejs/core';
 import { Enums as csToolsEnums, annotation } from '@cornerstonejs/tools';
 import type { Types as OhifTypes } from '@ohif/core';
-import PanoramicCurveTool, { CURVE_EVENT } from './tools/PanoramicCurveTool';
+import PanoramicCurveTool, { clearPanoramicCurves } from './tools/PanoramicCurveTool';
 import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
 import type { Point3 } from './curve/types';
@@ -22,7 +23,9 @@ const CURVE_BINDINGS = [
 
 let escapeHandler: ((evt: KeyboardEvent) => void) | null = null;
 let contextMenuHandler: ((evt: Event) => void) | null = null;
+let contextMenuElement: HTMLDivElement | null = null;
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let reconstructionRequestId = 0;
 const previousCrosshairsActive = new Map<string, boolean>();
 
 function commandsModule({
@@ -78,6 +81,17 @@ function commandsModule({
       toolbarService?.refreshToolbarState?.({ viewportId });
     },
 
+    scheduleReconstruction({ points, viewportId }: { points: Point3[]; viewportId: string }) {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      const pointSnapshot = points.map(point => [...point] as Point3);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        actions.reconstructFromPoints({ points: pointSnapshot, viewportId });
+      }, 150);
+    },
+
     bindCurveTool({ editMode }: { editMode: boolean }) {
       const { viewportId, viewport } = actions.getSourceViewport();
       if (!viewport) {
@@ -101,12 +115,7 @@ function commandsModule({
           actions.reconstructFromPoints({ points, viewportId, notify: true });
           return;
         }
-        if (debounceTimer) {
-          clearTimeout(debounceTimer);
-        }
-        debounceTimer = setTimeout(() => {
-          actions.reconstructFromPoints({ points, viewportId });
-        }, 150);
+        actions.scheduleReconstruction({ points, viewportId });
       };
 
       const toolGroupIds = actions.getCurveToolGroupIds();
@@ -141,7 +150,7 @@ function commandsModule({
 
       const element = viewport.element;
       if (contextMenuHandler) {
-        element.removeEventListener('contextmenu', contextMenuHandler);
+        contextMenuElement?.removeEventListener('contextmenu', contextMenuHandler);
       }
       contextMenuHandler = evt => {
         evt.preventDefault();
@@ -168,6 +177,7 @@ function commandsModule({
         actions.reconstructFromPoints({ points, viewportId, notify: true });
       };
       element.addEventListener('contextmenu', contextMenuHandler);
+      contextMenuElement = element;
 
       if (escapeHandler) {
         window.removeEventListener('keydown', escapeHandler);
@@ -186,10 +196,10 @@ function commandsModule({
         clearTimeout(debounceTimer);
         debounceTimer = null;
       }
-      const { viewport } = actions.getSourceViewport();
-      if (viewport && contextMenuHandler) {
-        viewport.element.removeEventListener('contextmenu', contextMenuHandler);
+      if (contextMenuElement && contextMenuHandler) {
+        contextMenuElement.removeEventListener('contextmenu', contextMenuHandler);
         contextMenuHandler = null;
+        contextMenuElement = null;
       }
       if (escapeHandler) {
         window.removeEventListener('keydown', escapeHandler);
@@ -244,7 +254,8 @@ function commandsModule({
       }
       uiNotificationService.show({
         title: 'Curva panorámica',
-        message: 'Clic izquierdo: puntos. Clic derecho: terminar. Clic de nuevo en Dibujar para salir.',
+        message:
+          'Clic izquierdo: puntos. Clic derecho: terminar. Clic de nuevo en Dibujar para salir.',
         type: 'info',
         duration: 2500,
       });
@@ -291,21 +302,73 @@ function commandsModule({
       actions.bindCurveTool({ editMode: true });
     },
 
+    async clearPanoramicCurve() {
+      reconstructionRequestId += 1;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      actions.deactivateCurveTool({ restore: true });
+
+      const state = viewportGridService.getState();
+      const panoramicViewportIds: string[] = [];
+      let clearedCurve = false;
+
+      for (const [viewportId, viewportState] of state.viewports.entries()) {
+        const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+        if (viewport?.element) {
+          const curves = annotation.state.getAnnotations(TOOL_NAME, viewport.element) || [];
+          if (curves.length) {
+            clearPanoramicCurves(viewport.element);
+            clearedCurve = true;
+          }
+        }
+        if ((viewportState.displaySetInstanceUIDs || []).includes(PANORAMIC_DISPLAY_SET_UID)) {
+          panoramicViewportIds.push(viewportId);
+        }
+      }
+
+      if (panoramicViewportIds.length) {
+        await viewportGridService.setDisplaySetsForViewports(
+          panoramicViewportIds.map(viewportId => ({
+            viewportId,
+            displaySetInstanceUIDs: [],
+          }))
+        );
+      }
+
+      const panoramicDisplaySet = displaySetService.getDisplaySetByUID(PANORAMIC_DISPLAY_SET_UID);
+      for (const imageId of panoramicDisplaySet?.imageIds || []) {
+        if (cache.getImage(imageId)) {
+          cache.removeImageLoadObject(imageId, { force: true });
+        }
+      }
+      servicesManager.services.cornerstoneCacheService?.stackImageIds?.delete(
+        PANORAMIC_DISPLAY_SET_UID
+      );
+      if (panoramicDisplaySet) {
+        displaySetService.deleteDisplaySet(PANORAMIC_DISPLAY_SET_UID);
+      }
+
+      uiNotificationService.show({
+        title: 'Curva panorámica',
+        message:
+          clearedCurve || panoramicDisplaySet
+            ? 'Curva y reconstrucción panorámica eliminadas.'
+            : 'No hay una curva panorámica para limpiar.',
+        type: 'info',
+        duration: 2000,
+      });
+      actions.refreshCurveToolbar();
+    },
+
     setPanoramicThickness({ value }) {
       const mm = setPanoramicThicknessMm(Number(value));
       const host = actions.findCurveHost();
       if (!host.points || host.points.length < 2) {
         return mm;
       }
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-      debounceTimer = setTimeout(() => {
-        actions.reconstructFromPoints({
-          points: host.points,
-          viewportId: host.viewportId,
-        });
-      }, 150);
+      actions.scheduleReconstruction({ points: host.points, viewportId: host.viewportId });
       return mm;
     },
 
@@ -318,6 +381,7 @@ function commandsModule({
       viewportId: string;
       notify?: boolean;
     }) {
+      const requestId = ++reconstructionRequestId;
       if (!points || points.length < 2) {
         uiNotificationService.show({
           title: 'Curva panorámica',
@@ -345,12 +409,24 @@ function commandsModule({
           });
         }
         const { panoramicDisplaySet, imageId } = await reconstructPanoramic({
-          controlPoints: points,
+          controlPoints: points.map(point => [...point] as Point3),
           displaySet,
           dataSource,
           displaySetService,
           thicknessMm: getPanoramicThicknessMm(),
         });
+
+        if (requestId !== reconstructionRequestId) {
+          if (cache.getImage(imageId)) {
+            cache.removeImageLoadObject(imageId, { force: true });
+          }
+          const currentPanoramicDisplaySet =
+            displaySetService.getDisplaySetByUID(PANORAMIC_DISPLAY_SET_UID);
+          if (currentPanoramicDisplaySet?.imageIds?.includes(imageId)) {
+            displaySetService.deleteDisplaySet(PANORAMIC_DISPLAY_SET_UID);
+          }
+          return;
+        }
 
         const cacheService = servicesManager.services.cornerstoneCacheService;
         cacheService?.stackImageIds?.delete(PANORAMIC_DISPLAY_SET_UID);
@@ -413,31 +489,12 @@ function commandsModule({
     },
   };
 
-  if (typeof document !== 'undefined' && !document.documentElement.dataset.panoramicCurveListen) {
-    document.documentElement.dataset.panoramicCurveListen = '1';
-    document.addEventListener(CURVE_EVENT, (evt: CustomEvent) => {
-      const { points, reason } = evt.detail || {};
-      const viewportId = viewportGridService.getActiveViewportId();
-      if (reason === 'finish') {
-        actions.deactivateCurveTool({ restore: true });
-        actions.reconstructFromPoints({ points, viewportId, notify: true });
-      } else if (reason === 'edit') {
-        actions.reconstructFromPoints({ points, viewportId });
-      } else if (reason === 'need-two-points') {
-        uiNotificationService.show({
-          title: 'Curva panorámica',
-          message: 'Haz al menos dos puntos y termina con clic derecho.',
-          type: 'info',
-        });
-      }
-    });
-  }
-
   return {
     actions,
     definitions: {
       drawPanoramicCurve: { commandFn: actions.drawPanoramicCurve },
       editPanoramicCurve: { commandFn: actions.editPanoramicCurve },
+      clearPanoramicCurve: { commandFn: actions.clearPanoramicCurve },
       deactivateCurveTool: { commandFn: actions.deactivateCurveTool },
       reconstructFromPoints: { commandFn: actions.reconstructFromPoints },
       setPanoramicThickness: { commandFn: actions.setPanoramicThickness },

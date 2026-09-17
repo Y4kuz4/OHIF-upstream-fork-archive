@@ -285,7 +285,11 @@ class PanoramicCurveTool extends AnnotationTool {
     points: Point3[],
     reason: 'finish' | 'edit' | 'drawing' | 'need-two-points'
   ) {
-    this.configuration.onCurveChanged?.({ points: points.map(p => [...p] as Point3), reason, element });
+    this.configuration.onCurveChanged?.({
+      points: points.map(p => [...p] as Point3),
+      reason,
+      element,
+    });
     element.dispatchEvent(
       new CustomEvent(CURVE_EVENT, {
         detail: { points, reason },
@@ -305,6 +309,7 @@ function triggerRender(element) {
 
 export function clearPanoramicCurves(element: HTMLDivElement) {
   removeAnnotations(PanoramicCurveTool.toolName, element);
+  triggerRender(element);
 }
 
 export { CURVE_EVENT };
