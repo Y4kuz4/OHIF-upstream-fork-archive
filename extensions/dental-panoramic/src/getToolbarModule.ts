@@ -1,7 +1,6 @@
 import PanoramicCurveTool from './tools/PanoramicCurveTool';
 import ThicknessButton from './components/ThicknessButton';
 import PanoramicToolsButton from './components/PanoramicToolsButton';
-import SharpnessButton from './components/SharpnessButton';
 
 export default function getToolbarModule({ servicesManager }: withAppTypes) {
   const { toolGroupService } = servicesManager.services;
@@ -60,10 +59,6 @@ export default function getToolbarModule({ servicesManager }: withAppTypes) {
     {
       name: 'dentalPanoramic.thicknessButton',
       defaultComponent: ThicknessButton,
-    },
-    {
-      name: 'dentalPanoramic.sharpnessButton',
-      defaultComponent: SharpnessButton,
     },
     {
       name: 'dentalPanoramic.toolsButton',

@@ -7,7 +7,6 @@ import PanoramicCurveTool, {
 } from './tools/PanoramicCurveTool';
 import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
-import { getPanoramicSharpness, setPanoramicSharpness } from './sampler/sharpness';
 import type { Point3 } from './curve/types';
 import { updatePanoramicViewportImage } from './viewport/updatePanoramicViewport';
 
@@ -467,29 +466,6 @@ function commandsModule({
       return mm;
     },
 
-    setPanoramicSharpness({ value }) {
-      const sharpness = setPanoramicSharpness(Number(value));
-      const host = actions.findCurveHost();
-      const context =
-        host.points?.length >= 2
-          ? {
-              points: host.points,
-              viewportId: host.viewportId,
-              sourceDisplaySetUID: host.sourceDisplaySetUID,
-            }
-          : lastCurveContext;
-      if (!context?.points || context.points.length < 2) {
-        return sharpness;
-      }
-      const mode = actions.getCurveMode();
-      if (mode.active && mode.editMode) {
-        actions.deferEditReconstruction(context);
-        return sharpness;
-      }
-      actions.scheduleReconstruction(context);
-      return sharpness;
-    },
-
     async reconstructFromPoints({
       points,
       viewportId,
@@ -552,7 +528,6 @@ function commandsModule({
           dataSource,
           displaySetService,
           thicknessMm: getPanoramicThicknessMm(),
-          sharpness: getPanoramicSharpness(),
         });
 
         if (requestId !== reconstructionRequestId) {
@@ -634,7 +609,6 @@ function commandsModule({
       deactivateCurveTool: { commandFn: actions.deactivateCurveTool },
       reconstructFromPoints: { commandFn: actions.reconstructFromPoints },
       setPanoramicThickness: { commandFn: actions.setPanoramicThickness },
-      setPanoramicSharpness: { commandFn: actions.setPanoramicSharpness },
     },
     defaultContext: 'DEFAULT',
   };
