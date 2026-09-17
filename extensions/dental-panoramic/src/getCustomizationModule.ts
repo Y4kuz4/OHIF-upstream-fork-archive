@@ -30,7 +30,7 @@ const toolbarButtons: Button[] = [
       icon: 'tool-annotate',
       label: 'Editar curva',
       tooltip:
-        'Editar la curva: arrastra puntos o la línea; Ctrl + clic sobre la curva inserta y sobre un punto borra. Clic de nuevo o Esc para salir.',
+        'Editar sin pausas: mueve varios puntos; la panorámica se reconstruye al salir. Ctrl + clic inserta o borra puntos.',
       commands: 'editPanoramicCurve',
       evaluate: 'evaluate.dentalPanoramic.edit',
     },

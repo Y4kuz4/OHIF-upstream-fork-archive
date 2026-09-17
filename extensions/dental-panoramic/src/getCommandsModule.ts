@@ -53,6 +53,7 @@ function commandsModule({
     toolbarService,
   } = servicesManager.services as AppTypes.Services;
   let lastCurveContext: CurveContext | null = null;
+  let pendingEditContext: CurveContext | null = null;
 
   const actions = {
     getSourceViewport() {
@@ -123,11 +124,24 @@ function commandsModule({
       }, EDIT_RECONSTRUCTION_DEBOUNCE_MS);
     },
 
+    deferEditReconstruction({ points, viewportId, sourceDisplaySetUID }: CurveContext) {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      const pointSnapshot = points.map(point => [...point] as Point3);
+      pendingEditContext = { points: pointSnapshot, viewportId, sourceDisplaySetUID };
+      lastCurveContext = pendingEditContext;
+    },
+
     bindCurveTool({ editMode }: { editMode: boolean }) {
       const { viewportId, viewport } = actions.getSourceViewport();
       if (!viewport) {
         return;
       }
+      const sourceDisplaySetUID = viewportGridService
+        .getDisplaySetsUIDsForViewport(viewportId)
+        ?.find(uid => uid !== PANORAMIC_DISPLAY_SET_UID);
 
       const handler = ({ points, reason }) => {
         if (reason === 'need-two-points') {
@@ -146,7 +160,11 @@ function commandsModule({
           actions.reconstructFromPoints({ points, viewportId, notify: true });
           return;
         }
-        actions.scheduleReconstruction({ points, viewportId });
+        if (editMode) {
+          actions.deferEditReconstruction({ points, viewportId, sourceDisplaySetUID });
+          return;
+        }
+        actions.scheduleReconstruction({ points, viewportId, sourceDisplaySetUID });
       };
 
       const toolGroupIds = actions.getCurveToolGroupIds();
@@ -223,7 +241,14 @@ function commandsModule({
       actions.renderCurveAnnotations();
     },
 
-    deactivateCurveTool({ restore } = { restore: true }) {
+    deactivateCurveTool(
+      { restore = true, reconstructPending = true } = {
+        restore: true,
+        reconstructPending: true,
+      }
+    ) {
+      const finalEditContext = reconstructPending ? pendingEditContext : null;
+      pendingEditContext = null;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
@@ -268,6 +293,9 @@ function commandsModule({
       });
       actions.refreshCurveToolbar();
       actions.renderCurveAnnotations();
+      if (finalEditContext) {
+        actions.reconstructFromPoints(finalEditContext);
+      }
     },
 
     drawPanoramicCurve() {
@@ -340,17 +368,25 @@ function commandsModule({
         actions.deactivateCurveTool({ restore: true });
         return;
       }
+      pendingEditContext = null;
+      uiNotificationService.show({
+        title: 'Editar curva panorámica',
+        message: 'Mueve todos los puntos que necesites. La panorámica se actualizará al salir.',
+        type: 'info',
+        duration: 3000,
+      });
       actions.bindCurveTool({ editMode: true });
     },
 
     async clearPanoramicCurve() {
       reconstructionRequestId += 1;
       lastCurveContext = null;
+      pendingEditContext = null;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
         debounceTimer = null;
       }
-      actions.deactivateCurveTool({ restore: true });
+      actions.deactivateCurveTool({ restore: true, reconstructPending: false });
 
       const state = viewportGridService.getState();
       const panoramicViewportIds: string[] = [];
@@ -419,6 +455,11 @@ function commandsModule({
             }
           : lastCurveContext;
       if (!context?.points || context.points.length < 2) {
+        return mm;
+      }
+      const mode = actions.getCurveMode();
+      if (mode.active && mode.editMode) {
+        actions.deferEditReconstruction(context);
         return mm;
       }
       actions.scheduleReconstruction(context);
