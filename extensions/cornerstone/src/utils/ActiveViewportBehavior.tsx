@@ -32,12 +32,27 @@ const ActiveViewportBehavior = memo(
         return;
       }
 
-      const modalities = displaySets.map(displaySet => displaySet?.Modality);
       const isDynamicVolume = displaySets.some(displaySet => displaySet?.isDynamicVolume);
 
       const sourceModalities = customizationService.getCustomization('autoCineModalities');
 
-      const requiresCine = modalities.some(modality => sourceModalities.includes(modality));
+      const requiresCine = displaySets.some(displaySet => {
+        if (!sourceModalities.includes(displaySet?.Modality)) {
+          return false;
+        }
+
+        // Modality alone is not enough to justify cine controls.  For example,
+        // a derived single-frame Secondary Capture commonly uses OT, as does
+        // the dental panoramic reconstruction.  Only auto-enable cine when
+        // there is actually more than one image/frame to play.
+        return (
+          Number(displaySet?.numImageFrames) > 1 ||
+          displaySet?.imageIds?.length > 1 ||
+          displaySet?.images?.length > 1 ||
+          displaySet?.instances?.length > 1 ||
+          Boolean(displaySet?.FrameRate)
+        );
+      });
 
       if ((requiresCine || isDynamicVolume) && !cineService.getState().isCineEnabled) {
         cineService.setIsCineEnabled(true);
