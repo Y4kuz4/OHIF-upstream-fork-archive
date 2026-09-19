@@ -663,8 +663,8 @@ function commandsModule({
           type: 'info',
           duration: 2000,
         });
-        await dataSource.store.dicom(imageDataset, { sourceDisplaySet });
-        await dataSource.store.dicom(curveDataset, { sourceDisplaySet });
+        await dataSource.store.dicom(imageDataset);
+        await dataSource.store.dicom(curveDataset);
         uiNotificationService.show({
           title: 'Guardar panorámica',
           message: 'La panorámica y su curva editable se guardaron en el estudio.',
@@ -672,6 +672,7 @@ function commandsModule({
           duration: 3500,
         });
       } catch (error) {
+        console.error('[DentalPanoramic] Error al guardar en PACS', error);
         uiNotificationService.show({
           title: 'Guardar panorámica',
           message: error?.message || 'El PACS rechazó la panorámica o la curva DICOM.',
