@@ -359,5 +359,22 @@ export function renderPanoramicCurve(element: HTMLDivElement) {
   triggerRender(element);
 }
 
+export function setPanoramicCurve(element: HTMLDivElement, points: Point3[], completed = true) {
+  const viewport = getEnabledElement(element)?.viewport;
+  if (!viewport || points.length < 2) {
+    return null;
+  }
+  removeAnnotations(PanoramicCurveTool.toolName, element);
+  const annotationRecord = PanoramicCurveTool.createAnnotationForViewport(viewport, {
+    data: {
+      handles: { points: points.map(point => [...point] as Point3) },
+      completed,
+    },
+  });
+  addAnnotation(annotationRecord, element);
+  triggerRender(element);
+  return annotationRecord;
+}
+
 export { CURVE_EVENT };
 export default PanoramicCurveTool;

@@ -47,6 +47,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'StorePanoramicInPacs',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'Export',
+      label: 'Guardar en PACS',
+      tooltip: 'Guardar la reconstrucción y la curva editable en el estudio DICOM',
+      commands: 'storePanoramicInPacs',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'ClearPanoramicCurve',
     uiType: 'ohif.toolButton',
     props: {
@@ -76,6 +87,7 @@ const toolbarSections = {
     'PanoramicCurve',
     'EditPanoramicCurve',
     'PanoramicThickness',
+    'StorePanoramicInPacs',
     'ClearPanoramicCurve',
   ],
 };

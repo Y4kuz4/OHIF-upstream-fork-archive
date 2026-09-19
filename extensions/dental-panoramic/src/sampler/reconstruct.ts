@@ -5,6 +5,7 @@ import type { Point3 } from '../curve/types';
 import { sampleCurvedMpr } from './curvedMpr';
 import { getPanoramicThicknessMm } from './thickness';
 import { getVolumeProjectionRange } from './volumeGeometry';
+import { copySourceMetadata } from '../persistence/panoramicDicom';
 
 const { ImageSet } = classes;
 const { VoxelManager, genericMetadataProvider } = csUtils;
@@ -78,7 +79,9 @@ export function upsertPanoramicDisplaySet({
   rows,
 }) {
   const existing = displaySetService.getDisplaySetByUID?.(PANORAMIC_DISPLAY_SET_UID);
+  const sourceMetadata = copySourceMetadata(sourceDisplaySet);
   const instance = {
+    ...sourceMetadata,
     SOPInstanceUID: 'dental-panoramic-sop',
     SeriesInstanceUID: 'dental-panoramic-series',
     StudyInstanceUID: sourceDisplaySet.StudyInstanceUID,
@@ -90,6 +93,7 @@ export function upsertPanoramicDisplaySet({
   };
 
   if (existing) {
+    Object.assign(existing, sourceMetadata);
     existing.imageIds = [imageId];
     existing.images[0] = instance;
     existing.instances = existing.images;
@@ -101,6 +105,7 @@ export function upsertPanoramicDisplaySet({
 
   const imageSet = new ImageSet([instance]);
   imageSet.setAttributes({
+    ...sourceMetadata,
     displaySetInstanceUID: PANORAMIC_DISPLAY_SET_UID,
     SOPClassHandlerId: '@ohif/extension-default.sopClassHandlerModule.stack',
     SeriesInstanceUID: 'dental-panoramic-series',

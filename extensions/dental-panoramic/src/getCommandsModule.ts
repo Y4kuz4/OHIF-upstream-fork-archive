@@ -4,11 +4,18 @@ import type { Types as OhifTypes } from '@ohif/core';
 import PanoramicCurveTool, {
   clearPanoramicCurves,
   renderPanoramicCurve,
+  setPanoramicCurve,
 } from './tools/PanoramicCurveTool';
 import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
 import type { Point3 } from './curve/types';
 import { updatePanoramicViewportImage } from './viewport/updatePanoramicViewport';
+import {
+  createPanoramicCurveDataset,
+  createPanoramicImageDataset,
+  findPanoramicCurve,
+} from './persistence/panoramicDicom';
+import type { PanoramicResult } from './persistence/panoramicDicom';
 
 const { MouseBindings, KeyboardBindings } = csToolsEnums;
 const TOOL_NAME = PanoramicCurveTool.toolName;
@@ -39,6 +46,12 @@ type CurveContext = {
   sourceDisplaySetUID?: string;
 };
 
+type PanoramicReconstructionContext = {
+  result: PanoramicResult;
+  sourceDisplaySet: any;
+  sourceDisplaySetUID: string;
+};
+
 function commandsModule({
   servicesManager,
   commandsManager,
@@ -54,6 +67,7 @@ function commandsModule({
   } = servicesManager.services as AppTypes.Services;
   let lastCurveContext: CurveContext | null = null;
   let pendingEditContext: CurveContext | null = null;
+  let lastPanoramicResult: PanoramicReconstructionContext | null = null;
 
   const actions = {
     getSourceViewport() {
@@ -353,8 +367,44 @@ function commandsModule({
       };
     },
 
+    restorePanoramicCurve() {
+      const activeDisplaySets = displaySetService.getActiveDisplaySets?.() ?? [];
+      const state = viewportGridService.getState();
+      const activeId = viewportGridService.getActiveViewportId();
+      const viewportIds = [activeId, ...[...state.viewports.keys()].filter(id => id !== activeId)];
+      for (const viewportId of viewportIds) {
+        const sourceDisplaySetUID = viewportGridService
+          .getDisplaySetsUIDsForViewport(viewportId)
+          ?.find(uid => uid !== PANORAMIC_DISPLAY_SET_UID);
+        const sourceDisplaySet = sourceDisplaySetUID
+          ? displaySetService.getDisplaySetByUID(sourceDisplaySetUID)
+          : null;
+        const viewport = cornerstoneViewportService.getCornerstoneViewport(viewportId);
+        if (!sourceDisplaySet || !viewport?.element) {
+          continue;
+        }
+        const persisted = findPanoramicCurve(activeDisplaySets, sourceDisplaySet);
+        if (!persisted) {
+          continue;
+        }
+        setPanoramicThicknessMm(persisted.thicknessMm);
+        setPanoramicCurve(viewport.element, persisted.points);
+        lastCurveContext = {
+          points: persisted.points,
+          viewportId,
+          sourceDisplaySetUID,
+        };
+        return true;
+      }
+      return false;
+    },
+
     editPanoramicCurve() {
-      const { viewport, points } = actions.findCurveHost();
+      let host = actions.findCurveHost();
+      if (!host.points?.length && actions.restorePanoramicCurve()) {
+        host = actions.findCurveHost();
+      }
+      const { viewport, points } = host;
       if (!viewport || !points || points.length < 2) {
         uiNotificationService.show({
           title: 'Curva panorámica',
@@ -381,6 +431,7 @@ function commandsModule({
     async clearPanoramicCurve() {
       reconstructionRequestId += 1;
       lastCurveContext = null;
+      lastPanoramicResult = null;
       pendingEditContext = null;
       if (debounceTimer) {
         clearTimeout(debounceTimer);
@@ -522,7 +573,7 @@ function commandsModule({
             duration: 2000,
           });
         }
-        const { panoramicDisplaySet, imageId } = await reconstructPanoramic({
+        const { result, panoramicDisplaySet, imageId } = await reconstructPanoramic({
           controlPoints: pointSnapshot,
           displaySet,
           dataSource,
@@ -542,6 +593,12 @@ function commandsModule({
           return;
         }
 
+        lastPanoramicResult = {
+          result,
+          sourceDisplaySet: displaySet,
+          sourceDisplaySetUID: sourceUid,
+        };
+
         const cacheService = servicesManager.services.cornerstoneCacheService;
         cacheService?.stackImageIds?.delete(PANORAMIC_DISPLAY_SET_UID);
 
@@ -555,6 +612,69 @@ function commandsModule({
         uiNotificationService.show({
           title: 'Curva panorámica',
           message: error?.message || 'No se pudo reconstruir la panorámica.',
+          type: 'error',
+        });
+      }
+    },
+
+    async storePanoramicInPacs() {
+      if (!lastCurveContext?.points?.length) {
+        uiNotificationService.show({
+          title: 'Guardar panorámica',
+          message: 'Primero dibuja o reconstruye una curva panorámica.',
+          type: 'info',
+        });
+        return;
+      }
+
+      const dataSource = extensionManager.getActiveDataSource()[0];
+      if (!dataSource?.store?.dicom) {
+        uiNotificationService.show({
+          title: 'Guardar panorámica',
+          message: 'La fuente DICOM activa no permite almacenar objetos mediante STOW-RS.',
+          type: 'warning',
+        });
+        return;
+      }
+
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+        debounceTimer = null;
+      }
+      lastPanoramicResult = null;
+      await actions.reconstructFromPoints(lastCurveContext);
+      if (!lastPanoramicResult) {
+        return;
+      }
+
+      try {
+        const { result, sourceDisplaySet, sourceDisplaySetUID } = lastPanoramicResult;
+        const imageDataset = createPanoramicImageDataset({ sourceDisplaySet, result });
+        const curveDataset = createPanoramicCurveDataset({
+          sourceDisplaySet,
+          points: lastCurveContext.points,
+          thicknessMm: getPanoramicThicknessMm(),
+          sourceDisplaySetUID,
+          panoramicImage: imageDataset,
+        });
+        uiNotificationService.show({
+          title: 'Guardar panorámica',
+          message: 'Guardando imagen y curva en el PACS…',
+          type: 'info',
+          duration: 2000,
+        });
+        await dataSource.store.dicom(imageDataset, { sourceDisplaySet });
+        await dataSource.store.dicom(curveDataset, { sourceDisplaySet });
+        uiNotificationService.show({
+          title: 'Guardar panorámica',
+          message: 'La panorámica y su curva editable se guardaron en el estudio.',
+          type: 'success',
+          duration: 3500,
+        });
+      } catch (error) {
+        uiNotificationService.show({
+          title: 'Guardar panorámica',
+          message: error?.message || 'El PACS rechazó la panorámica o la curva DICOM.',
           type: 'error',
         });
       }
@@ -609,6 +729,7 @@ function commandsModule({
       deactivateCurveTool: { commandFn: actions.deactivateCurveTool },
       reconstructFromPoints: { commandFn: actions.reconstructFromPoints },
       setPanoramicThickness: { commandFn: actions.setPanoramicThickness },
+      storePanoramicInPacs: { commandFn: actions.storePanoramicInPacs },
     },
     defaultContext: 'DEFAULT',
   };
