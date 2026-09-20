@@ -6,6 +6,9 @@ window.config = {
   extensions: [],
   modes: [],
   customizationService: ['@ohif/extension-default.customizationModule.theme'],
+  investigationalUseDialog: {
+    option: 'never',
+  },
   showStudyList: true,
   maxNumberOfWebWorkers: 3,
   showWarningMessageForCrossOrigin: true,
