@@ -47,6 +47,17 @@ const toolbarButtons: Button[] = [
     },
   },
   {
+    id: 'PanoramicPostProcessing',
+    uiType: 'ohif.toolButton',
+    props: {
+      icon: 'tool-window-level',
+      label: 'Postprocesado',
+      tooltip: 'Realce panorámico no destructivo',
+      commands: 'setPanoramicPostProcessing',
+      evaluate: 'evaluate.action',
+    },
+  },
+  {
     id: 'StorePanoramicInPacs',
     uiType: 'ohif.toolButton',
     props: {
@@ -87,6 +98,7 @@ const toolbarSections = {
     'PanoramicCurve',
     'EditPanoramicCurve',
     'PanoramicThickness',
+    'PanoramicPostProcessing',
     'StorePanoramicInPacs',
     'ClearPanoramicCurve',
   ],

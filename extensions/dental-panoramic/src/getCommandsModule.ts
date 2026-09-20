@@ -6,8 +6,17 @@ import PanoramicCurveTool, {
   renderPanoramicCurve,
   setPanoramicCurve,
 } from './tools/PanoramicCurveTool';
-import { PANORAMIC_DISPLAY_SET_UID, reconstructPanoramic } from './sampler/reconstruct';
+import {
+  PANORAMIC_DISPLAY_SET_UID,
+  reconstructPanoramic,
+  renderPanoramicResult,
+} from './sampler/reconstruct';
 import { getPanoramicThicknessMm, setPanoramicThicknessMm } from './sampler/thickness';
+import {
+  applyPanoramicPostProcessing,
+  setPanoramicPostProcessing,
+  type PanoramicPostProcessingSettings,
+} from './sampler/postProcessing';
 import type { Point3 } from './curve/types';
 import { updatePanoramicViewportImage } from './viewport/updatePanoramicViewport';
 import {
@@ -517,6 +526,49 @@ function commandsModule({
       return mm;
     },
 
+    async setPanoramicPostProcessing({
+      settings,
+    }: {
+      settings: Partial<PanoramicPostProcessingSettings>;
+    }) {
+      const resolved = setPanoramicPostProcessing(settings || {});
+      if (!lastPanoramicResult || !lastCurveContext) {
+        uiNotificationService.show({
+          title: 'Postprocesado panorámico',
+          message: 'Primero genera una reconstrucción panorámica.',
+          type: 'info',
+          duration: 2000,
+        });
+        return resolved;
+      }
+
+      const { result, sourceDisplaySet, sourceDisplaySetUID } = lastPanoramicResult;
+      const pixels = applyPanoramicPostProcessing({
+        pixels: result.pixels,
+        columns: result.columns,
+        rows: result.rows,
+        min: result.min,
+        max: result.max,
+        settings: resolved,
+      });
+      const { panoramicDisplaySet, imageId } = renderPanoramicResult({
+        result,
+        displaySet: sourceDisplaySet,
+        displaySetService,
+        pixels,
+      });
+      servicesManager.services.cornerstoneCacheService?.stackImageIds?.delete(
+        PANORAMIC_DISPLAY_SET_UID
+      );
+      await actions.showPanoramicViewport({
+        sourceViewportId: lastCurveContext.viewportId,
+        sourceDisplaySetUID,
+        panoramicDisplaySet,
+        imageId,
+      });
+      return resolved;
+    },
+
     async reconstructFromPoints({
       points,
       viewportId,
@@ -730,6 +782,7 @@ function commandsModule({
       deactivateCurveTool: { commandFn: actions.deactivateCurveTool },
       reconstructFromPoints: { commandFn: actions.reconstructFromPoints },
       setPanoramicThickness: { commandFn: actions.setPanoramicThickness },
+      setPanoramicPostProcessing: { commandFn: actions.setPanoramicPostProcessing },
       storePanoramicInPacs: { commandFn: actions.storePanoramicInPacs },
     },
     defaultContext: 'DEFAULT',

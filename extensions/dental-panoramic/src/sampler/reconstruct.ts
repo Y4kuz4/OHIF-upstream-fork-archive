@@ -6,6 +6,7 @@ import { sampleCurvedMpr } from './curvedMpr';
 import { getPanoramicThicknessMm } from './thickness';
 import { getVolumeProjectionRange } from './volumeGeometry';
 import { copySourceMetadata } from '../persistence/panoramicDicom';
+import { applyPanoramicPostProcessing } from './postProcessing';
 
 const { ImageSet } = classes;
 const { VoxelManager, genericMetadataProvider } = csUtils;
@@ -16,6 +17,20 @@ export const PANORAMIC_IMAGE_ID = 'local://dental-panoramic';
 const VOLUME_LOADER_SCHEME = 'cornerstoneStreamingImageVolume';
 
 let panoramicGeneration = 0;
+
+function pixelRange(pixels: ArrayLike<number>) {
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (let index = 0; index < pixels.length; index++) {
+    const value = Number(pixels[index]);
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  }
+  return Number.isFinite(min) ? { min, max } : { min: 0, max: 0 };
+}
 
 function minSpacing(volume): number {
   const spacing = volume?.spacing ?? [1, 1, 1];
@@ -131,6 +146,55 @@ export function upsertPanoramicDisplaySet({
   return imageSet;
 }
 
+/**
+ * Creates a new local image from an already reconstructed panoramic result.
+ * This lets display-only filters update without sampling the CT volume again.
+ */
+export function renderPanoramicResult({
+  result,
+  displaySet,
+  displaySetService,
+  pixels = result.pixels,
+}) {
+  panoramicGeneration += 1;
+  const imageId = `${PANORAMIC_IMAGE_ID}-${panoramicGeneration}`;
+  const previousId = `${PANORAMIC_IMAGE_ID}-${panoramicGeneration - 1}`;
+  if (panoramicGeneration > 1 && cache.getImage(previousId)) {
+    cache.removeImageLoadObject(previousId, { force: true });
+  }
+
+  imageLoader.createAndCacheLocalImage(imageId, {
+    scalarData: pixels,
+    dimensions: [result.columns, result.rows],
+    spacing: [result.columnSpacing, result.rowSpacing],
+    origin: [0, 0, 0],
+    direction: [1, 0, 0, 0, 1, 0, 0, 0, 1],
+  });
+
+  // StackViewport.buildMetadata destructures GENERAL_SERIES.modality; local images
+  // only register IMAGE_PLANE / IMAGE_PIXEL unless we add this.
+  genericMetadataProvider.add(imageId, {
+    type: MetadataModules.GENERAL_SERIES,
+    metadata: { modality: displaySet.Modality || 'CT' },
+  });
+  const cached = cache.getImage(imageId);
+  if (cached) {
+    const range = pixelRange(pixels);
+    cached.windowWidth = Math.max(1, range.max - range.min);
+    cached.windowCenter = (range.max + range.min) / 2;
+  }
+
+  const panoramicDisplaySet = upsertPanoramicDisplaySet({
+    displaySetService,
+    sourceDisplaySet: displaySet,
+    imageId,
+    columns: result.columns,
+    rows: result.rows,
+  });
+
+  return { panoramicDisplaySet, imageId };
+}
+
 export async function reconstructPanoramic({
   controlPoints,
   displaySet,
@@ -169,40 +233,18 @@ export async function reconstructPanoramic({
     throw new Error('La curva no tiene longitud suficiente');
   }
 
-  panoramicGeneration += 1;
-  const imageId = `${PANORAMIC_IMAGE_ID}-${panoramicGeneration}`;
-  const previousId = `${PANORAMIC_IMAGE_ID}-${panoramicGeneration - 1}`;
-  if (panoramicGeneration > 1 && cache.getImage(previousId)) {
-    cache.removeImageLoadObject(previousId, { force: true });
-  }
-
-  imageLoader.createAndCacheLocalImage(imageId, {
-    scalarData: result.pixels,
-    dimensions: [result.columns, result.rows],
-    spacing: [result.columnSpacing, result.rowSpacing],
-    origin: [0, 0, 0],
-    direction: [1, 0, 0, 0, 1, 0, 0, 0, 1],
-  });
-
-  // StackViewport.buildMetadata destructures GENERAL_SERIES.modality; local images
-  // only register IMAGE_PLANE / IMAGE_PIXEL unless we add this.
-  genericMetadataProvider.add(imageId, {
-    type: MetadataModules.GENERAL_SERIES,
-    metadata: { modality: displaySet.Modality || 'CT' },
-  });
-  const cached = cache.getImage(imageId);
-  if (cached) {
-    const ww = Math.max(1, result.max - result.min);
-    cached.windowWidth = ww;
-    cached.windowCenter = (result.max + result.min) / 2;
-  }
-
-  const panoramicDisplaySet = upsertPanoramicDisplaySet({
-    displaySetService,
-    sourceDisplaySet: displaySet,
-    imageId,
+  const displayPixels = applyPanoramicPostProcessing({
+    pixels: result.pixels,
     columns: result.columns,
     rows: result.rows,
+    min: result.min,
+    max: result.max,
+  });
+  const { panoramicDisplaySet, imageId } = renderPanoramicResult({
+    result,
+    displaySet,
+    displaySetService,
+    pixels: displayPixels,
   });
 
   return { result, panoramicDisplaySet, imageId };
